@@ -1,74 +1,88 @@
 from generation import *
-from person import *
-# from events import *
+from person import Person, Census, CensusAnnual
+
+
 
 class World:
     def __init__(self, w, m):
-        self.count = 0
-        self.date = (0, 0)
+        self.count = w + m
+        self.census = Census(w, m)
         self.year = 0
         self.persons = {}
         self.alive = []
-        self.died_person = []
         self.couples = []
         self.create_population(w, m)
-        
-
+        self.census_x_year = []
+      
     def create_population(self, W, M):
         self.count = W + M
         sex = 0
         for i in range(1, self.count + 1):
             if i > M:
                 sex = 1
-            age = U(0, 100)
+            age = rd.randint(0, 100)
             p = Person(i, sex, age)
             self.persons[i] = p
             self.alive.append(i)
     
-    def born_baby(self, info):
-        mom, dad = info
+    def create_baby(self, info_parents = None):
         self.count += 1
-        print("Born baby:", self.count)
-        p = Person(self.count,sex_child(), 0)
-        self.persons[mom].pregnacy -= 1
-        self.persons[mom].childs.append(p.id)
-        self.persons[dad].childs.append(p.id)
-        self.persons[self.count] = p
-        self.alive.append(self.count)
-
-    def dead(self ):
-        self.died_person = []
-        for i in self.alive:
-            p = self.persons[i]
-            if die(p.age, p.sex):  #ver si tenia pareja
-                print("Dead person:", i)
-                self.died_person.append(i)
-                self.update_dead(i)
-                self.persons.__delitem__(i)
-            else:
-                p.age += 1
-        self.update_alive()
-        print("Year: ", self.year, "dead", len(self.died_person), "persons")
+        if info_parents == None:
+            return None
+        
+        mom, dad = info_parents
+        if self.persons.get(mom, None) != None : 
+            self.persons[mom].pregnancy -= 1
+            self.persons[mom].childs += 1
+            if self.persons.get(dad, None) != None :
+                self.persons[dad].childs += 1
+            sex = sex_child()
+            self.census.born_baby(sex)
+            p = Person(self.count, sex, 0)
+            self.persons[self.count] = p
+            self.alive.append(self.count)
+            return self.count, sex
+        return None
+        
+    
+    def update_alive(self):
+        self.alive = []
+        for i in self.persons.keys():
+            self.alive.append(i)
     
     def update_dead(self, id):
         p = self.persons[id]
+        self.census.dead_p()
+            
+        self.census.dead_person(p.sex)
+        self.persons.__delitem__(id)
+
         if p.partner != None:
             if p.sex == 1: # was women
                 couple = ( id, p.partner)
             else:
                 couple = (p.partner, id)
-            self.couples = [c for c in self.couples if c != couple]
-            self.persons[p.partner].partner = None #TODO enviuda=> time alone        
-        
-    def update_alive(self):
-        self.alive = []
-        for i in self.persons.keys():
-            self.alive.append(i)
+            self.couples = [c for c in self.couples if c != couple] #delete the couple
+
+            widower = self.persons[p.partner]
+            widower.partner = None 
+            widower.available = False
+            return (widower.id, self.define_time_alone(widower.id))    #time along for p.partner
+
+        return None  
+
+    def update_ages(self):
+        for id in self.persons.keys():
+            self.persons[id].age += 1
+        self.census_x_year.append(self.extract_info_census())
+
+    def extract_info_census(self):
+        return CensusAnnual(self.census.womans, self.census.mens, self.census.alive_woman, self.census.alive_men, self.census.new_babys, self.census.dead, len(self.couples))
 
     def alone_persons(self):
         p = []
         for i in self.persons.keys():
-            if self.persons[i].partner == None:
+            if self.persons[i].available and self.persons[i].partner == None:
                 p.append(i)
         return p
 
@@ -96,38 +110,34 @@ class World:
                     
     def break_couple(self):
         l = []
+        break_c = []
         for i in self.couples:
             if breaking():
                 self.persons[i[0]].partner = None
                 self.persons[i[1]].partner = None
+                break_c.append((i[0], self.define_time_alone(i[0])))
+                break_c.append((i[1], self.define_time_alone(i[1])))
+                self.persons[i[0]].available = False
+                self.persons[i[1]].available = False
             else:
                 l.append(i)
         self.couples = l
+        return break_c
 
     def pregnancy(self):
         info = []
         for c in self.couples:
             w = self.persons[c[0]]
             m = self.persons[c[1]]
-            if(w.pregnacy == 0 and len(w.childs) < w.max_child and len(m.childs) < m.max_child ):
+            if(w.pregnancy == 0 and w.childs < w.max_child and m.childs < m.max_child ):
                 if pregnant(w.age):
-                    num_child = pregnancy_child()
-                    w.pregnacy = num_child
+                    num_child = pregnancy_child() #TODO arreglar pregnancy
+                    w.pregnancy = num_child
                     info.append((c[0], c[1], num_child))
         return info
                    
-
-def main():
-    w = World(10, 10)
-
-    w.matching()
-    print(w.couples)
-    w.dead()
-    w.matching()
-    print(w.couples)
-    w.dead()
-    # print(w.pregnancy())
-    
-if (__name__ == "__main__"):
-    main()
+    def define_time_alone(self, id):
+        p = self.persons[id]
+        t = time_alone(p.age)
+        return t
        
