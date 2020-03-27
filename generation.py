@@ -6,13 +6,13 @@ def U(a, b):
     """
     Generate a Uniform variable u ~ U(a,b)
     """
-    return rd.uniform(a,b)
+    return a + (b-a)*rd.uniform(0, 1)
 
 def Expon(lamb):
     """
     Generate a Exponential variable with parameter lamb
     """
-    return -math.log(rd.uniform(0,1))/ lamb
+    return -1 * math.log(U(0,1), math.e)/lamb
 
 def Ber(p):
     """
@@ -24,17 +24,24 @@ def Ber(p):
     else:
          return 0
 
-def die(age, sex):
+def dead_year(age, sex):
     """
-    Return 1: if a person died
-           0: stay alive
+    Return the year dead
     """
-    if sex == 0: #is men
-        p = selector(p_die_m, age)
+    if sex == 0:
+        i_age = selector(p_die_m, age)
+    else: 
+        i_age = selector(p_die_w, age)
+
+    u = U(i_age[0], 1) #probabilidad del intervalo de edad en que muere
+    if sex == 0:
+        i_year = selector(p_year_die_m, u)
     else:
-        p = selector(p_die_w, age)
+        i_year = selector(p_year_die_w, u)
     
-    return Ber(p)
+    year = rd.randint(max(age, i_year[0]), 125)
+    return year
+    
 
 def pregnant(age):
     """
@@ -73,7 +80,7 @@ def time_alone(age):
     Return the time needed to be alone
     """
     lamb = selector(p_time_alone, age)
-    return Expon(lamb)
+    return int(math.ceil(Expon(lamb)))
 
 def max_child_wished():
     """
